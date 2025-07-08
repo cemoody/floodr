@@ -3,6 +3,7 @@
 use futures::future::join_all;
 use futures::stream::{self, StreamExt};
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 use reqwest::{Client, Method};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -329,15 +330,16 @@ impl ParallelClient {
         })
     }
 
-    fn execute<'py>(&self, py: Python<'py>, requests: Vec<Request>) -> PyResult<&'py PyAny> {
+    fn execute<'py>(&self, py: Python<'py>, requests: Vec<Request>) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         let num_requests = requests.len();
         
-        pyo3_asyncio::tokio::future_into_py(py, async move {
+        pyo3::coroutine::Coroutine::new(py, None, async move {
             // Use backpressure for large batches
             if num_requests > 100 {
                 let max_concurrent = (num_requests / 10).max(100).min(500);
-                Ok(execute_requests_with_backpressure(client, requests, max_concurrent).await)
+                let responses = execute_requests_with_backpressure(client, requests, max_concurrent).await;
+                Python::with_gil(|py| Ok(responses.into_pyobject(py)?.into_any()))
             } else {
                 // For smaller batches, use the original approach
                 let futures: Vec<_> = requests
@@ -349,25 +351,27 @@ impl ParallelClient {
                     .collect();
                 
                 let responses = join_all(futures).await;
-                Ok(responses)
+                Python::with_gil(|py| Ok(responses.into_pyobject(py)?.into_any()))
             }
         })
     }
     
     // Execute with custom concurrency limit
-    fn execute_with_concurrency<'py>(&self, py: Python<'py>, requests: Vec<Request>, max_concurrent: Option<usize>) -> PyResult<&'py PyAny> {
+    fn execute_with_concurrency<'py>(&self, py: Python<'py>, requests: Vec<Request>, max_concurrent: Option<usize>) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         let num_requests = requests.len();
         
-        pyo3_asyncio::tokio::future_into_py(py, async move {
+        pyo3::coroutine::Coroutine::new(py, None, async move {
             if let Some(limit) = max_concurrent {
                 // Use specified concurrency limit
-                Ok(execute_requests_with_backpressure(client, requests, limit).await)
+                let responses = execute_requests_with_backpressure(client, requests, limit).await;
+                Python::with_gil(|py| Ok(responses.into_pyobject(py)?.into_any()))
             } else {
                 // Use default behavior
                 if num_requests > 100 {
                     let max_concurrent = (num_requests / 10).max(100).min(500);
-                    Ok(execute_requests_with_backpressure(client, requests, max_concurrent).await)
+                    let responses = execute_requests_with_backpressure(client, requests, max_concurrent).await;
+                    Python::with_gil(|py| Ok(responses.into_pyobject(py)?.into_any()))
                 } else {
                     // For smaller batches, use the original approach
                     let futures: Vec<_> = requests
@@ -379,26 +383,26 @@ impl ParallelClient {
                         .collect();
                     
                     let responses = join_all(futures).await;
-                    Ok(responses)
+                    Python::with_gil(|py| Ok(responses.into_pyobject(py)?.into_any()))
                 }
             }
         })
     }
     
     // Warm up the connection pool by making a dummy request
-    fn warmup<'py>(&self, py: Python<'py>, url: String) -> PyResult<&'py PyAny> {
+    fn warmup<'py>(&self, py: Python<'py>, url: String) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         
-        pyo3_asyncio::tokio::future_into_py(py, async move {
+        pyo3::coroutine::Coroutine::new(py, None, async move {
             let _ = client.get(&url).send().await;
-            Ok(())
+            Python::with_gil(|py| Ok(py.None().into()))
         })
     }
 }
 
 /// Fast parallel HTTP client for Python, powered by Rust
 #[pymodule]
-fn floodr(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
+fn floodr(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Request>()?;
     m.add_class::<Response>()?;
     m.add_class::<ParallelClient>()?;
@@ -414,10 +418,10 @@ fn floodr(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
         enable_compression: bool,
         use_global_client: bool,
         max_concurrent: Option<usize>,
-    ) -> PyResult<&'py PyAny> {
+    ) -> PyResult<Bound<'py, PyAny>> {
         let num_requests = requests.len();
         
-        pyo3_asyncio::tokio::future_into_py(py, async move {
+        pyo3::coroutine::Coroutine::new(py, None, async move {
             let client = if use_global_client {
                 // Use global client with dynamic pool sizing
                 get_or_create_global_client(num_requests, enable_compression).await
@@ -445,12 +449,14 @@ fn floodr(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
             
             // Use specified concurrency or default behavior
             if let Some(limit) = max_concurrent {
-                Ok(execute_requests_with_backpressure(client, requests, limit).await)
+                let responses = execute_requests_with_backpressure(client, requests, limit).await;
+                Python::with_gil(|py| Ok(responses.into_pyobject(py)?.into_any()))
             } else {
                 // Use default behavior based on batch size
                 if num_requests > 100 {
                     let max_concurrent = (num_requests / 10).max(100).min(500);
-                    Ok(execute_requests_with_backpressure(client, requests, max_concurrent).await)
+                    let responses = execute_requests_with_backpressure(client, requests, max_concurrent).await;
+                    Python::with_gil(|py| Ok(responses.into_pyobject(py)?.into_any()))
                 } else {
                     // For smaller batches, use the original approach
                     let futures: Vec<_> = requests
@@ -462,7 +468,7 @@ fn floodr(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
                         .collect();
                     
                     let responses = join_all(futures).await;
-                    Ok(responses)
+                    Python::with_gil(|py| Ok(responses.into_pyobject(py)?.into_any()))
                 }
             }
         })
@@ -470,8 +476,8 @@ fn floodr(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     
     // Warmup function for global client
     #[pyfunction]
-    fn warmup<'py>(py: Python<'py>, url: String) -> PyResult<&'py PyAny> {
-        pyo3_asyncio::tokio::future_into_py(py, async move {
+    fn warmup<'py>(py: Python<'py>, url: String) -> PyResult<Bound<'py, PyAny>> {
+        pyo3::coroutine::Coroutine::new(py, None, async move {
             let client = get_or_create_global_client(100, false).await;
             
             // Make a simple HEAD request to warm up the connection pool
@@ -481,7 +487,7 @@ fn floodr(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
                 .send()
                 .await;
             
-            Ok(())
+            Python::with_gil(|py| Ok(py.None().into()))
         })
     }
     
@@ -490,6 +496,8 @@ fn floodr(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     
     Ok(())
 }
+
+
 
 #[cfg(test)]
 mod tests {
