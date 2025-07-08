@@ -1,7 +1,5 @@
 """Tests for floodr library."""
 
-import asyncio
-
 import pytest
 
 from floodr import Client, request, warmup
@@ -88,7 +86,7 @@ def test_response_model():
 
     assert resp.ok
     assert resp.text == '{"result": "ok"}'
-    assert resp.json() == {"result": "ok"}
+    assert resp.json_data() == {"result": "ok"}
 
 
 if __name__ == "__main__":

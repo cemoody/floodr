@@ -12,7 +12,7 @@ class Request(BaseModel):
     method: Literal["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"] = Field(
         default="GET", description="HTTP method"
     )
-    url: HttpUrl = Field(description="URL to request")
+    url: Union[HttpUrl, str] = Field(description="URL to request")
     headers: Optional[Dict[str, str]] = Field(default=None, description="HTTP headers")
     params: Optional[Dict[str, Union[str, list[str]]]] = Field(
         default=None, description="URL query parameters"
@@ -29,7 +29,7 @@ class Request(BaseModel):
 
     @field_validator("json_data")
     @classmethod
-    def validate_json(cls, v):
+    def validate_json(cls, v: Any) -> Any:
         """Ensure json is serializable"""
         if v is not None:
             try:
@@ -40,13 +40,13 @@ class Request(BaseModel):
 
     @field_validator("method")
     @classmethod
-    def uppercase_method(cls, v):
+    def uppercase_method(cls, v: str) -> str:
         """Ensure method is uppercase"""
         return v.upper()
 
-    def to_rust_request(self) -> dict:
+    def to_rust_request(self) -> Dict[str, Any]:
         """Convert to format expected by Rust"""
-        rust_req = {
+        rust_req: Dict[str, Any] = {
             "url": str(self.url),
             "method": self.method,
         }
@@ -98,7 +98,7 @@ class Response(BaseModel):
         """Check if response was successful (2xx status)"""
         return 200 <= self.status_code < 300
 
-    def json(self) -> Any:
+    def json_data(self) -> Any:
         """Parse response body as JSON"""
         return json_module.loads(self.text)
 
