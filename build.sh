@@ -1,9 +1,9 @@
 #!/bin/bash
-# Build script for preq Python package
+# Build script for floodr Python package
 
 set -e
 
-echo "Building preq Python package..."
+echo "Building floodr Python package..."
 
 # Check if Rust is installed (required for building)
 if ! command -v cargo &> /dev/null; then
@@ -33,7 +33,7 @@ ls -la target/wheels/
 
 echo ""
 echo "To install locally:"
-echo "  pip install target/wheels/preq-*.whl"
+echo "  pip install target/wheels/floodr-*.whl"
 echo ""
 echo "To upload to PyPI:"
 echo "  pip install twine"

@@ -3,7 +3,7 @@ include pyproject.toml
 include README.md
 include LICENSE
 recursive-include src *.rs
-recursive-include preq *.py *.pyi
+recursive-include floodr *.py *.pyi
 recursive-include tests *.py
 recursive-include examples *.py
 prune target

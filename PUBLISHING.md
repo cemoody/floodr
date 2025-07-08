@@ -1,6 +1,6 @@
 # Publishing to PyPI
 
-This guide explains how to publish preq to PyPI.
+This guide explains how to publish floodr to PyPI.
 
 ## Prerequisites
 
@@ -60,7 +60,7 @@ twine upload --repository testpypi target/wheels/*
 
 2. Install from Test PyPI:
 ```bash
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ preq
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ floodr
 ```
 
 ## Publishing
@@ -94,8 +94,8 @@ To use automated publishing:
 
 1. Verify installation:
 ```bash
-pip install preq
-python -c "import preq; print(preq.__version__)"
+pip install floodr
+python -c "import floodr; print(floodr.__version__)"
 ```
 
 2. Update documentation if needed

@@ -1,9 +1,9 @@
-# preq - Fast Parallel HTTP Requests for Python
+# floodr - Fast Parallel HTTP Requests for Python
 
-[![PyPI version](https://badge.fury.io/py/preq.svg)](https://badge.fury.io/py/preq)
-[![Python](https://img.shields.io/pypi/pyversions/preq.svg)](https://pypi.org/project/preq/)
+[![PyPI version](https://badge.fury.io/py/floodr.svg)](https://badge.fury.io/py/floodr)
+[![Python](https://img.shields.io/pypi/pyversions/floodr.svg)](https://pypi.org/project/floodr/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://github.com/yourusername/preq/actions/workflows/test.yml/badge.svg)](https://github.com/yourusername/preq/actions/workflows/test.yml)
+[![Tests](https://github.com/yourusername/floodr/actions/workflows/test.yml/badge.svg)](https://github.com/yourusername/floodr/actions/workflows/test.yml)
 
 A high-performance Python library for parallel HTTP requests, built with Rust for speed and reliability. Perfect for bulk API requests, web scraping, and any scenario where you need to fetch multiple URLs concurrently.
 
@@ -22,21 +22,21 @@ A high-performance Python library for parallel HTTP requests, built with Rust fo
 ### From PyPI
 
 ```bash
-pip install preq
+pip install floodr
 ```
 
 ### With uv
 
 ```bash
-uv add preq
+uv add floodr
 ```
 
 ### From source
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/preq.git
-cd preq
+git clone https://github.com/yourusername/floodr.git
+cd floodr
 
 # Create a virtual environment
 python -m venv venv
@@ -58,7 +58,7 @@ maturin develop --release
 
 ```python
 import asyncio
-import preq
+import floodr
 
 async def main():
     # Simple parallel GET requests
@@ -68,7 +68,7 @@ async def main():
         "https://api.github.com/users/rust-lang"
     ]
     
-    responses = await preq.get(urls)
+    responses = await floodr.get(urls)
     
     for url, resp in zip(urls, responses):
         data = resp.json()
@@ -79,10 +79,10 @@ asyncio.run(main())
 
 ## API Reference
 
-The preq library provides a modern API using Pydantic models for request/response handling:
+The floodr library provides a modern API using Pydantic models for request/response handling:
 
 ```python
-from preq import Request, Response, request
+from floodr import Request, Response, request
 
 # Create requests with Pydantic validation
 requests = [
@@ -111,7 +111,7 @@ for resp in responses:
         data = resp.json()  # Parse JSON response
 
 # Use the client for connection reuse
-from preq import Client
+from floodr import Client
 client = Client(max_connections=2048)
 responses = await client.request(requests)
 
@@ -146,10 +146,10 @@ The `Response` model provides:
 
 ### Error Handling
 
-preq provides comprehensive error handling without interrupting batch processing:
+floodr provides comprehensive error handling without interrupting batch processing:
 
 ```python
-from preq import Request, request
+from floodr import Request, request
 
 requests = [
     Request(url="https://httpbin.org/status/200"),  # Success
@@ -230,7 +230,7 @@ responses = await client.request(requests, max_concurrent=20)
 
 ## Performance
 
-preq is designed for high-performance parallel requests:
+floodr is designed for high-performance parallel requests:
 
 - **6-10x faster** than pure Python solutions like aiohttp for parallel requests
 - **Automatic concurrency management** prevents overwhelming servers
@@ -239,7 +239,7 @@ preq is designed for high-performance parallel requests:
 
 ### Benchmarks
 
-| Concurrent Requests | aiohttp | httpx | preq | Speedup |
+| Concurrent Requests | aiohttp | httpx | floodr | Speedup |
 |-------------------|---------|-------|------|---------|
 | 100 | 1.2s | 1.1s | 0.3s | 4x |
 | 500 | 5.8s | 5.2s | 0.8s | 7x |
@@ -255,8 +255,8 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 
 ```bash
 # Clone and install in development mode
-git clone https://github.com/yourusername/preq.git
-cd preq
+git clone https://github.com/yourusername/floodr.git
+cd floodr
 pip install -e ".[dev]"
 
 # Run tests
@@ -266,10 +266,10 @@ pytest
 ./scripts/test_all.sh
 
 # Format code
-black preq tests
+black floodr tests
 
 # Lint
-ruff check preq tests
+ruff check floodr tests
 ```
 
 ## License
@@ -278,7 +278,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Technical Details
 
-preq is a Python library with a Rust backend for maximum performance. It's not intended to be used as a standalone Rust crate, but rather as a Python package that leverages Rust's speed and safety.
+floodr is a Python library with a Rust backend for maximum performance. It's not intended to be used as a standalone Rust crate, but rather as a Python package that leverages Rust's speed and safety.
 
 ## Acknowledgments
 

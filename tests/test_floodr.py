@@ -1,11 +1,9 @@
-"""Tests for preq library."""
-
-import asyncio
+"""Tests for floodr library."""
 
 import pytest
 
-from preq import Client, request, warmup
-from preq.models import Request, Response
+from floodr import Client, request, warmup
+from floodr.models import Request, Response
 
 
 @pytest.mark.asyncio
@@ -88,7 +86,7 @@ def test_response_model():
 
     assert resp.ok
     assert resp.text == '{"result": "ok"}'
-    assert resp.json() == {"result": "ok"}
+    assert resp.json_data() == {"result": "ok"}
 
 
 if __name__ == "__main__":
