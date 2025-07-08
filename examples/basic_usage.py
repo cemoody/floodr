@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Basic usage examples for preq library."""
+"""Basic usage examples for floodr library."""
 
 import asyncio
 import time
 from typing import List
 
-from preq import Client, Request, request, warmup
+from floodr import Client, Request, request, warmup
 
 
 async def simple_get_example():
@@ -46,7 +46,7 @@ async def parallel_requests_example():
     print(f"Time: {sequential_time:.3f}s")
 
     # Time parallel requests
-    print("\nParallel requests with preq:")
+    print("\nParallel requests with floodr:")
     start = time.time()
     requests_list = [Request(url=url) for url in urls]
     responses = await request(requests_list)
@@ -65,8 +65,8 @@ async def post_with_json_example():
     req = Request(
         url="https://httpbin.org/post",
         method="POST",
-        json={"name": "preq", "type": "library", "fast": True},
-        headers={"X-Custom-Header": "preq-example"},
+        json={"name": "floodr", "type": "library", "fast": True},
+        headers={"X-Custom-Header": "floodr-example"},
     )
 
     responses = await request([req])
@@ -157,7 +157,7 @@ async def concurrency_control_example():
 
 async def main():
     """Run all examples."""
-    print("preq Library Examples\n")
+    print("floodr Library Examples\n")
 
     # Warmup connection pool
     print("Warming up...")

@@ -1,24 +1,65 @@
 """
-preq - Fast parallel HTTP requests for Python, powered by Rust
+floodr - Fast parallel HTTP requests for Python, powered by Rust
 
 A high-performance HTTP client library that executes multiple requests in parallel,
 similar to requests/httpx but optimized for bulk operations.
 """
 
-import asyncio
 import json as json_module
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional
 from urllib.parse import urlencode
 
 from .models import Request, Response
-from .preq import ParallelClient
 
-# Import the Rust extension
-from .preq import Request as _RustRequest
-from .preq import Response as _RustResponse
-from .preq import execute as _rust_execute
-from .preq import warmup as _rust_warmup
+if TYPE_CHECKING:
+    # Type stubs for Rust extension
+    class ParallelClient:
+        def __init__(
+            self,
+            max_connections: Optional[int],
+            timeout: float,
+            enable_compression: bool,
+        ) -> None: ...
+        async def execute(self, requests: list[Any]) -> list[Any]: ...
+        async def execute_with_concurrency(
+            self, requests: list[Any], max_concurrent: int
+        ) -> list[Any]: ...
+        async def warmup(self, url: str) -> None: ...
+
+    class _RustRequest:
+        def __init__(
+            self,
+            url: str,
+            method: str,
+            headers: Optional[dict[str, str]] = None,
+            json: Optional[str] = None,
+            data: Optional[bytes] = None,
+            timeout: Optional[float] = None,
+        ) -> None: ...
+
+    class _RustResponse:
+        status_code: int
+        headers: dict[str, str]
+        content: bytes
+        elapsed: float
+        url: str
+        error: Optional[str]
+
+    async def _rust_execute(
+        requests: list[_RustRequest],
+        use_global_client: bool = True,
+        max_concurrent: Optional[int] = None,
+        **kwargs: Any,
+    ) -> list[_RustResponse]: ...
+    async def _rust_warmup(url: str) -> None: ...
+
+else:
+    # Import the Rust extension
+    from .floodr import ParallelClient
+    from .floodr import Request as _RustRequest
+    from .floodr import Response as _RustResponse
+    from .floodr import execute as _rust_execute
+    from .floodr import warmup as _rust_warmup
 
 __version__ = "0.1.0"
 __all__ = [
@@ -51,8 +92,8 @@ class Client:
         self.timeout = timeout
 
     async def request(
-        self, requests: List[Request], max_concurrent: Optional[int] = None
-    ) -> List[Response]:
+        self, requests: list[Request], max_concurrent: Optional[int] = None
+    ) -> list[Response]:
         """
         Execute multiple requests in parallel.
 
@@ -63,10 +104,12 @@ class Client:
         Returns:
             List of Response objects in the same order as requests
         """
-        rust_requests = [req.to_rust_request() for req in requests]
+        rust_requests: list[dict[str, Any]] = [
+            req.to_rust_request() for req in requests
+        ]
 
         # Convert to the old Request format expected by Rust
-        old_format_requests = []
+        old_format_requests: list[_RustRequest] = []
         for rust_req in rust_requests:
             # Handle params by adding to URL
             url = rust_req["url"]
@@ -121,11 +164,11 @@ def _convert_response(rust_response: _RustResponse) -> Response:
 
 # Module-level convenience function
 async def request(
-    requests: List[Request],
+    requests: list[Request],
     use_global_client: bool = True,
     max_concurrent: Optional[int] = None,
-    **client_kwargs,
-) -> List[Response]:
+    **client_kwargs: Any,
+) -> list[Response]:
     """
     Execute multiple requests in parallel.
 
@@ -138,7 +181,7 @@ async def request(
     Returns:
         List of Response objects
     """
-    rust_requests = []
+    rust_requests: list[_RustRequest] = []
     for req in requests:
         rust_req = req.to_rust_request()
 

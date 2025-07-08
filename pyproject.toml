@@ -3,11 +3,11 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "preq"
+name = "floodr"
 version = "0.1.0"
 description = "Fast parallel HTTP requests for Python, powered by Rust"
 readme = "README.md"
-authors = [{name = "preq contributors", email = ""}]
+authors = [{name = "floodr contributors", email = ""}]
 license = "MIT"
 requires-python = ">=3.9"
 keywords = ["http", "requests", "async", "parallel", "rust", "performance", "client"]
@@ -32,10 +32,10 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/preq"
-Documentation = "https://github.com/yourusername/preq#readme"
-Repository = "https://github.com/yourusername/preq"
-Issues = "https://github.com/yourusername/preq/issues"
+Homepage = "https://github.com/yourusername/floodr"
+Documentation = "https://github.com/yourusername/floodr#readme"
+Repository = "https://github.com/yourusername/floodr"
+Issues = "https://github.com/yourusername/floodr/issues"
 
 [project.optional-dependencies]
 dev = [

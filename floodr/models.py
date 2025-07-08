@@ -1,7 +1,7 @@
 """Pydantic models for preq API"""
 
 import json as json_module
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
@@ -12,15 +12,15 @@ class Request(BaseModel):
     method: Literal["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"] = Field(
         default="GET", description="HTTP method"
     )
-    url: HttpUrl = Field(description="URL to request")
-    headers: Optional[Dict[str, str]] = Field(default=None, description="HTTP headers")
-    params: Optional[Dict[str, Union[str, list[str]]]] = Field(
+    url: Union[HttpUrl, str] = Field(description="URL to request")
+    headers: Optional[dict[str, str]] = Field(default=None, description="HTTP headers")
+    params: Optional[dict[str, Union[str, list[str]]]] = Field(
         default=None, description="URL query parameters"
     )
     json_data: Optional[Any] = Field(
         default=None, description="JSON body (will be serialized)", alias="json"
     )
-    data: Optional[Union[str, bytes, Dict[str, Any]]] = Field(
+    data: Optional[Union[str, bytes, dict[str, Any]]] = Field(
         default=None, description="Form data or raw body"
     )
     timeout: Optional[float] = Field(
@@ -29,24 +29,24 @@ class Request(BaseModel):
 
     @field_validator("json_data")
     @classmethod
-    def validate_json(cls, v):
+    def validate_json(cls, v: Any) -> Any:
         """Ensure json is serializable"""
         if v is not None:
             try:
                 json_module.dumps(v)
             except (TypeError, ValueError) as e:
-                raise ValueError(f"JSON must be serializable: {e}")
+                raise ValueError(f"JSON must be serializable: {e}") from e
         return v
 
     @field_validator("method")
     @classmethod
-    def uppercase_method(cls, v):
+    def uppercase_method(cls, v: str) -> str:
         """Ensure method is uppercase"""
         return v.upper()
 
-    def to_rust_request(self) -> dict:
+    def to_rust_request(self) -> dict[str, Any]:
         """Convert to format expected by Rust"""
-        rust_req = {
+        rust_req: dict[str, Any] = {
             "url": str(self.url),
             "method": self.method,
         }
@@ -80,7 +80,7 @@ class Response(BaseModel):
     """HTTP response model"""
 
     status_code: int = Field(description="HTTP status code")
-    headers: Dict[str, str] = Field(description="Response headers")
+    headers: dict[str, str] = Field(description="Response headers")
     content: bytes = Field(description="Raw response body")
     elapsed: float = Field(description="Time taken for the request in seconds")
     url: str = Field(description="Final URL after redirects")
@@ -98,7 +98,7 @@ class Response(BaseModel):
         """Check if response was successful (2xx status)"""
         return 200 <= self.status_code < 300
 
-    def json(self) -> Any:
+    def json_data(self) -> Any:
         """Parse response body as JSON"""
         return json_module.loads(self.text)
 
