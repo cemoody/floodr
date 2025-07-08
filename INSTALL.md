@@ -1,6 +1,6 @@
-# Installing preq
+# Installing floodr
 
-preq is a Python library with a Rust extension that needs to be compiled.
+floodr is a Python library with a Rust extension that needs to be compiled.
 
 ## Prerequisites
 
@@ -21,7 +21,7 @@ source $HOME/.cargo/env
 pip install maturin
 ```
 
-### 3. Build and install preq in development mode
+### 3. Build and install floodr in development mode
 ```bash
 # From the project root directory
 maturin develop --release
@@ -34,15 +34,15 @@ This will:
 
 ### 4. Verify installation
 ```python
-import preq
-print(preq.__version__)
+import floodr
+print(floodr.__version__)
 ```
 
 ## Usage Example
 
 ```python
 import asyncio
-import preq
+import floodr
 
 async def main():
     # Simple parallel GET requests
@@ -52,7 +52,7 @@ async def main():
         "https://api.github.com/users/rust-lang"
     ]
     
-    responses = await preq.get(urls)
+    responses = await floodr.get(urls)
     
     for url, resp in zip(urls, responses):
         data = resp.json()
@@ -70,5 +70,5 @@ maturin build --release
 
 The wheel will be in `target/wheels/` and can be installed with:
 ```bash
-pip install target/wheels/preq-*.whl
+pip install target/wheels/floodr-*.whl
 ``` 

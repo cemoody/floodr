@@ -3,7 +3,7 @@
 [![PyPI version](https://badge.fury.io/py/floodr.svg)](https://badge.fury.io/py/floodr)
 [![Python](https://img.shields.io/pypi/pyversions/floodr.svg)](https://pypi.org/project/floodr/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://github.com/cemoody/floodr/actions/workflows/test.yml/badge.svg)](https://github.com/cemoody/preq/actions/workflows/test.yml)
+[![Tests](https://github.com/cemoody/floodr/actions/workflows/test.yml/badge.svg)](https://github.com/cemoody/floodr/actions/workflows/test.yml)
 
 A high-performance Python library for parallel HTTP requests, built with Rust for speed and reliability. Perfect for bulk API requests, web scraping, and any scenario where you need to fetch multiple URLs concurrently.
 
