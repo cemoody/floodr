@@ -1,3 +1,5 @@
+#![allow(non_local_definitions)]
+
 use futures::future::join_all;
 use futures::stream::{self, StreamExt};
 use pyo3::prelude::*;
