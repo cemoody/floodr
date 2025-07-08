@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Simple benchmark comparing httpx and preq performance."""
+"""Simple benchmark comparing httpx and floodr performance."""
 
 import asyncio
 import os
@@ -8,11 +8,11 @@ import time
 
 import httpx
 
-# Add parent directory to path to import preq
+# Add parent directory to path to import floodr
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from preq import request, warmup
-from preq.models import Request
+from floodr import request, warmup
+from floodr.models import Request
 
 
 async def benchmark_httpx(url: str, num_requests: int) -> float:
@@ -33,8 +33,8 @@ async def benchmark_httpx(url: str, num_requests: int) -> float:
     return elapsed
 
 
-async def benchmark_preq(url: str, num_requests: int) -> float:
-    """Benchmark preq with parallel requests."""
+async def benchmark_floodr(url: str, num_requests: int) -> float:
+    """Benchmark floodr with parallel requests."""
     # Warmup the client
     await warmup(url)
 
@@ -51,7 +51,7 @@ async def benchmark_preq(url: str, num_requests: int) -> float:
 
     elapsed = time.time() - start
     print(
-        f"preq:  {num_requests} requests in {elapsed:.3f}s ({success_count} successful)"
+        f"floodr: {num_requests} requests in {elapsed:.3f}s ({success_count} successful)"
     )
     return elapsed
 
@@ -70,11 +70,11 @@ async def main():
         # Run httpx benchmark
         httpx_time = await benchmark_httpx(url, count)
 
-        # Run preq benchmark
-        preq_time = await benchmark_preq(url, count)
+        # Run floodr benchmark
+        floodr_time = await benchmark_floodr(url, count)
 
         # Calculate speedup
-        speedup = httpx_time / preq_time
+        speedup = httpx_time / floodr_time
         print(f"Speedup: {speedup:.2f}x")
 
     print("\nBenchmark complete!")

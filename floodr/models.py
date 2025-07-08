@@ -1,4 +1,4 @@
-"""Pydantic models for preq API"""
+"""Pydantic models for floodr API"""
 
 import json as json_module
 from typing import Any, Literal, Optional, Union
