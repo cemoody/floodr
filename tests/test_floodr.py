@@ -1,11 +1,11 @@
-"""Tests for preq library."""
+"""Tests for floodr library."""
 
 import asyncio
 
 import pytest
 
-from preq import Client, request, warmup
-from preq.models import Request, Response
+from floodr import Client, request, warmup
+from floodr.models import Request, Response
 
 
 @pytest.mark.asyncio

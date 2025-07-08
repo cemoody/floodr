@@ -43,7 +43,7 @@ async fn get_or_create_global_client(num_requests: usize, enable_compression: bo
         .http2_adaptive_window(true)
         .http2_initial_stream_window_size(2_097_152) // 2MB initial window
         .http2_initial_connection_window_size(4_194_304) // 4MB connection window
-        .user_agent("preq/1.0");
+        .user_agent("floodr/1.0");
     
     if !enable_compression {
         builder = builder.no_gzip().no_brotli().no_deflate();
@@ -313,7 +313,7 @@ impl ParallelClient {
             .http2_adaptive_window(true)
             .http2_initial_stream_window_size(2_097_152)
             .http2_initial_connection_window_size(4_194_304)
-            .user_agent("preq/1.0");
+            .user_agent("floodr/1.0");
         
         if !enable_compression {
             builder = builder.no_gzip().no_brotli().no_deflate();
@@ -396,7 +396,7 @@ impl ParallelClient {
 
 /// Fast parallel HTTP client for Python, powered by Rust
 #[pymodule]
-fn preq(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
+fn floodr(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<Request>()?;
     m.add_class::<Response>()?;
     m.add_class::<ParallelClient>()?;
@@ -432,7 +432,7 @@ fn preq(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
                     .http2_adaptive_window(true)
                     .http2_initial_stream_window_size(2_097_152)
                     .http2_initial_connection_window_size(4_194_304)
-                    .user_agent("preq/1.0");
+                    .user_agent("floodr/1.0");
                 
                 if !enable_compression {
                     builder = builder.no_gzip().no_brotli().no_deflate();

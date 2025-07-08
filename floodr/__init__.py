@@ -1,5 +1,5 @@
 """
-preq - Fast parallel HTTP requests for Python, powered by Rust
+floodr - Fast parallel HTTP requests for Python, powered by Rust
 
 A high-performance HTTP client library that executes multiple requests in parallel,
 similar to requests/httpx but optimized for bulk operations.
@@ -12,13 +12,13 @@ from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlencode
 
 from .models import Request, Response
-from .preq import ParallelClient
+from .floodr import ParallelClient
 
 # Import the Rust extension
-from .preq import Request as _RustRequest
-from .preq import Response as _RustResponse
-from .preq import execute as _rust_execute
-from .preq import warmup as _rust_warmup
+from .floodr import Request as _RustRequest
+from .floodr import Response as _RustResponse
+from .floodr import execute as _rust_execute
+from .floodr import warmup as _rust_warmup
 
 __version__ = "0.1.0"
 __all__ = [

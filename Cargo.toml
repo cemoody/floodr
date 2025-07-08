@@ -1,11 +1,11 @@
 [package]
-name = "preq"
+name = "floodr"
 version = "0.1.0"
 edition = "2021"
 publish = false  # This is not a standalone Rust crate
 
 [lib]
-name = "preq"
+name = "floodr"
 crate-type = ["cdylib"]  # Only build as C dynamic library for Python
 
 [dependencies]

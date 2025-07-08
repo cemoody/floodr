@@ -3,7 +3,7 @@
 ## [0.1.0] - Unreleased
 
 ### Added
-- Initial release of preq Python package
+- Initial release of floodr Python package
 - Fast parallel HTTP requests powered by Rust
 - Support for GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS methods
 - Async/await support
