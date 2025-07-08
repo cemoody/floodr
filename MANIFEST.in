@@ -1,0 +1,19 @@
+include Cargo.toml
+include pyproject.toml
+include README.md
+include LICENSE
+recursive-include src *.rs
+recursive-include preq *.py *.pyi
+recursive-include tests *.py
+recursive-include examples *.py
+prune target
+prune __pycache__
+prune .git
+prune .github
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *.so
+global-exclude *.dylib
+global-exclude *.dll
+global-exclude *.pyd
+global-exclude __pycache__ 

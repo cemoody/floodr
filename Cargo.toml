@@ -1,0 +1,24 @@
+[package]
+name = "preq"
+version = "0.1.0"
+edition = "2021"
+publish = false  # This is not a standalone Rust crate
+
+[lib]
+name = "preq"
+crate-type = ["cdylib"]  # Only build as C dynamic library for Python
+
+[dependencies]
+tokio = { version = "1.40", features = ["full"] }
+reqwest = { version = "0.12", features = ["rustls-tls", "stream", "gzip", "brotli", "deflate", "json"] }
+futures = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+pyo3 = { version = "0.20", features = ["extension-module", "abi3-py39"] }
+pyo3-asyncio = { version = "0.20", features = ["tokio-runtime"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3 
