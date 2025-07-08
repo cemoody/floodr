@@ -48,6 +48,8 @@ jobs:
         pytest tests/ -v
     
     - name: Run Rust unit tests
+      # Skip on macOS due to PyO3 linking issues
+      if: runner.os != 'macOS'
       run: |
         cargo test --release
 
