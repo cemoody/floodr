@@ -40,7 +40,8 @@ jobs:
     
     - name: Build and install package
       run: |
-        maturin develop --release
+        maturin build --release
+        pip install target/wheels/*.whl
     
     - name: Run tests
       run: |
@@ -68,15 +69,16 @@ jobs:
         pip install black ruff mypy maturin pydantic
     
     - name: Check Python formatting with Black
-      run: black --check preq/ tests/
+      run: black --check floodr/ tests/
     
     - name: Lint with Ruff
-      run: ruff check preq/ tests/
+      run: ruff check floodr/ tests/
     
     - name: Set up Rust (needed for maturin develop)
       uses: dtolnay/rust-toolchain@stable
     
     - name: Type check with mypy
       run: |
-        maturin develop
-        mypy preq/ --ignore-missing-imports 
+        maturin build --release
+        pip install target/wheels/*.whl
+        mypy floodr/ --ignore-missing-imports 
