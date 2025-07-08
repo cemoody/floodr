@@ -2,10 +2,11 @@
 """Simple benchmark comparing httpx and preq performance."""
 
 import asyncio
-import time
-import httpx
-import sys
 import os
+import sys
+import time
+
+import httpx
 
 # Add parent directory to path to import preq
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
