@@ -8,8 +8,8 @@ from typing import List
 import httpx
 import uvloop  # Install with: pip install uvloop
 
-from preq import request, warmup
-from preq.models import Request
+from floodr import request, warmup
+from floodr.models import Request
 
 
 async def benchmark_httpx_basic(
@@ -102,14 +102,14 @@ async def benchmark_httpx_queue(
     return elapsed
 
 
-async def benchmark_preq(url: str, num_requests: int) -> float:
-    """Benchmark preq."""
+async def benchmark_floodr(url: str, num_requests: int) -> float:
+    """Benchmark floodr."""
     start = time.time()
     requests = [Request(url=url) for _ in range(num_requests)]
     responses = await request(requests)
     elapsed = time.time() - start
     success = sum(1 for r in responses if r.status_code == 200)
-    print(f"preq: {num_requests} requests in {elapsed:.3f}s ({success} OK)")
+    print(f"floodr: {num_requests} requests in {elapsed:.3f}s ({success} OK)")
     return elapsed
 
 
@@ -185,18 +185,18 @@ async def main():
             )
         await asyncio.sleep(0.5)
 
-        # Test preq
-        results[count]["preq"] = await benchmark_preq(url, count)
+        # Test floodr
+        results[count]["floodr"] = await benchmark_floodr(url, count)
 
         # Print comparisons
         print(f"\nPerformance comparison for {count} requests:")
-        preq_time = results[count]["preq"]
+        floodr_time = results[count]["floodr"]
         for method, time_taken in results[count].items():
-            if method != "preq":
-                speedup = time_taken / preq_time
+            if method != "floodr":
+                speedup = time_taken / floodr_time
                 improvement = results[count]["basic"] / time_taken
                 print(
-                    f"  {method}: {speedup:.2f}x slower than preq, "
+                    f"  {method}: {speedup:.2f}x slower than floodr, "
                     f"{improvement:.2f}x faster than basic httpx"
                 )
 
