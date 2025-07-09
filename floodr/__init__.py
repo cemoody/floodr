@@ -5,6 +5,7 @@ A high-performance HTTP client library that executes multiple requests in parall
 similar to requests/httpx but optimized for bulk operations.
 """
 
+import asyncio
 import json as json_module
 from typing import TYPE_CHECKING, Any, Optional
 from urllib.parse import urlencode
@@ -20,11 +21,11 @@ if TYPE_CHECKING:
             timeout: float,
             enable_compression: bool,
         ) -> None: ...
-        async def execute(self, requests: list[Any]) -> list[Any]: ...
-        async def execute_with_concurrency(
+        def execute(self, requests: list[Any]) -> list[Any]: ...
+        def execute_with_concurrency(
             self, requests: list[Any], max_concurrent: int
         ) -> list[Any]: ...
-        async def warmup(self, url: str) -> None: ...
+        def warmup(self, url: str) -> None: ...
 
     class _RustRequest:
         def __init__(
@@ -55,11 +56,33 @@ if TYPE_CHECKING:
 
 else:
     # Import the Rust extension
+    # Create async wrappers for the sync functions
+    import asyncio
+
     from .floodr import ParallelClient
     from .floodr import Request as _RustRequest
     from .floodr import Response as _RustResponse
-    from .floodr import execute as _rust_execute
-    from .floodr import warmup as _rust_warmup
+    from .floodr import execute_sync as _rust_execute_sync
+    from .floodr import warmup_sync as _rust_warmup_sync
+
+    async def _rust_execute(
+        requests, use_global_client=True, max_concurrent=None, **kwargs
+    ):
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            lambda: _rust_execute_sync(
+                requests,
+                use_global_client=use_global_client,
+                max_concurrent=max_concurrent,
+                **kwargs,
+            ),
+        )
+
+    async def _rust_warmup(url):
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, _rust_warmup_sync, url)
+
 
 __version__ = "0.1.0"
 __all__ = [
@@ -133,21 +156,29 @@ class Client:
             )
             old_format_requests.append(old_req)
 
+        # Run the sync methods in an executor
+        loop = asyncio.get_event_loop()
         if (
             hasattr(self._client, "execute_with_concurrency")
             and max_concurrent is not None
         ):
-            rust_responses = await self._client.execute_with_concurrency(
-                old_format_requests, max_concurrent
+            rust_responses = await loop.run_in_executor(
+                None,
+                self._client.execute_with_concurrency,
+                old_format_requests,
+                max_concurrent,
             )
         else:
-            rust_responses = await self._client.execute(old_format_requests)
+            rust_responses = await loop.run_in_executor(
+                None, self._client.execute, old_format_requests
+            )
 
         return [_convert_response(resp) for resp in rust_responses]
 
     async def warmup(self, url: str):
         """Warm up the connection pool by making a dummy request"""
-        await self._client.warmup(url)
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, self._client.warmup, url)
 
 
 def _convert_response(rust_response: _RustResponse) -> Response:

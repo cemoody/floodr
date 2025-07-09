@@ -3,7 +3,6 @@
 
 import asyncio
 import time
-from typing import List
 
 from floodr import Client, Request, request, warmup
 
