@@ -123,6 +123,7 @@ responses = await request(requests, max_concurrent=100)
 
 The `Request` model supports the following fields:
 - `url` (required): The URL to request (validated as proper URL)
+- `request_id`: Unique identifier for the request (auto-generated UUID if not provided)
 - `method`: HTTP method (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS) - defaults to GET
 - `headers`: Dictionary of HTTP headers
 - `params`: URL query parameters (dict or dict with list values for multiple params)
@@ -133,6 +134,7 @@ The `Request` model supports the following fields:
 ### Response Model
 
 The `Response` model provides:
+- `request_id`: The request ID from the original request (for matching requests to responses)
 - `status_code`: HTTP status code
 - `headers`: Response headers as dict
 - `content`: Raw response body as bytes
@@ -226,6 +228,61 @@ responses = await request(requests, max_concurrent=50)
 # Using client
 client = Client()
 responses = await client.request(requests, max_concurrent=20)
+```
+
+### Longtail Request Cancellation
+
+The longtail feature allows you to cancel slow requests after a certain percentage of requests have completed, plus an additional wait time. This is useful for improving overall latency when you have a mix of fast and slow requests.
+
+```python
+from floodr import Client, Request
+
+# Cancel remaining requests after 80% complete + 0.5 second wait
+client = Client(longtail_percentile=0.8, longtail_wait=0.5)
+
+requests = [
+    Request(url="https://fast-api.com/endpoint"),  # Fast
+    Request(url="https://fast-api.com/endpoint"),  # Fast
+    Request(url="https://fast-api.com/endpoint"),  # Fast
+    Request(url="https://fast-api.com/endpoint"),  # Fast
+    Request(url="https://slow-api.com/endpoint"),  # Slow (will be cancelled)
+]
+
+responses = await client.request(requests)
+
+# The slow request will be cancelled with an error message
+for resp in responses:
+    if not resp.ok and resp.error and "cancelled" in resp.error:
+        print(f"Request cancelled: {resp.error}")
+```
+
+#### Longtail Parameters
+
+- **longtail_percentile**: Float between 0.0 and 1.0 indicating the percentage of requests that must complete before starting the wait timer
+- **longtail_wait**: Float seconds to wait after the percentile is reached before cancelling remaining requests
+
+Both parameters must be set together. When enabled:
+1. Requests execute normally until `longtail_percentile` of them complete
+2. A timer starts for `longtail_wait` seconds
+3. Any requests that haven't completed when the timer expires are cancelled
+4. Cancelled requests return with `status_code=0` and an error message
+
+This feature is particularly useful for:
+- API endpoints with inconsistent response times
+- Reducing p99 latency in bulk operations
+- Implementing "best effort" data fetching where some failures are acceptable
+
+```python
+# With module-level function
+responses = await request(
+    requests,
+    longtail_percentile=0.9,  # Cancel after 90% complete
+    longtail_wait=1.0,        # Wait 1 second before cancelling
+)
+
+# Request IDs are preserved for tracking
+for resp in responses:
+    print(f"Request {resp.request_id}: {resp.status_code}")
 ```
 
 ### Connection Pool Warming

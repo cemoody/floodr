@@ -25,6 +25,13 @@ if TYPE_CHECKING:
         def execute_with_concurrency(
             self, requests: list[Any], max_concurrent: int
         ) -> list[Any]: ...
+        def execute_with_longtail(
+            self,
+            requests: list[Any],
+            longtail_percentile: float,
+            longtail_wait: float,
+            max_concurrent: Optional[int],
+        ) -> list[Any]: ...
         def warmup(self, url: str, num_connections: Optional[int] = None) -> None: ...
 
     class _RustRequest:
@@ -36,9 +43,11 @@ if TYPE_CHECKING:
             json: Optional[str] = None,
             data: Optional[bytes] = None,
             timeout: Optional[float] = None,
+            request_id: Optional[str] = None,
         ) -> None: ...
 
     class _RustResponse:
+        request_id: str
         status_code: int
         headers: dict[str, str]
         content: bytes
@@ -131,6 +140,8 @@ class Client:
         max_connections: Optional[int] = None,
         timeout: float = 60.0,
         enable_compression: bool = False,
+        longtail_percentile: Optional[float] = None,
+        longtail_wait: Optional[float] = None,
     ):
         """
         Initialize a parallel HTTP client.
@@ -139,9 +150,20 @@ class Client:
             max_connections: Maximum number of concurrent connections (None for dynamic sizing)
             timeout: Default timeout in seconds
             enable_compression: Enable gzip/brotli compression
+            longtail_percentile: Percentage of requests to complete before cancelling remaining (0.0-1.0)
+            longtail_wait: Seconds to wait after percentile is reached before cancelling
         """
+        if (longtail_percentile is None) != (longtail_wait is None):
+            raise ValueError(
+                "Both longtail_percentile and longtail_wait must be set together"
+            )
+        if longtail_percentile is not None and not (0.0 <= longtail_percentile <= 1.0):
+            raise ValueError("longtail_percentile must be between 0.0 and 1.0")
+
         self._client = ParallelClient(max_connections, timeout, enable_compression)
         self.timeout = timeout
+        self.longtail_percentile = longtail_percentile
+        self.longtail_wait = longtail_wait
 
     async def request(
         self, requests: list[Request], max_concurrent: Optional[int] = None
@@ -182,12 +204,24 @@ class Client:
                     rust_req.get("body") if "body" in rust_req else rust_req.get("data")
                 ),
                 timeout=rust_req.get("timeout"),
+                request_id=rust_req.get("request_id", ""),
             )
             old_format_requests.append(old_req)
 
         # Run the sync methods in an executor
         loop = asyncio.get_event_loop()
-        if (
+        
+        # Check if we should use longtail execution
+        if self.longtail_percentile is not None and self.longtail_wait is not None:
+            rust_responses = await loop.run_in_executor(
+                None,
+                self._client.execute_with_longtail,
+                old_format_requests,
+                self.longtail_percentile,
+                self.longtail_wait,
+                max_concurrent,
+            )
+        elif (
             hasattr(self._client, "execute_with_concurrency")
             and max_concurrent is not None
         ):
@@ -219,6 +253,7 @@ class Client:
 def _convert_response(rust_response: _RustResponse) -> Response:
     """Convert Rust response to Pydantic model"""
     return Response(
+        request_id=getattr(rust_response, "request_id", None),
         status_code=rust_response.status_code,
         headers=rust_response.headers,
         content=bytes(rust_response.content),
@@ -233,6 +268,8 @@ async def request(
     requests: list[Request],
     use_global_client: bool = True,
     max_concurrent: Optional[int] = None,
+    longtail_percentile: Optional[float] = None,
+    longtail_wait: Optional[float] = None,
     **client_kwargs: Any,
 ) -> list[Response]:
     """
@@ -242,11 +279,21 @@ async def request(
         requests: List of Request objects
         use_global_client: Use a global client for better performance (default: True)
         max_concurrent: Maximum concurrent requests (None for automatic based on batch size)
+        longtail_percentile: Percentage of requests to complete before cancelling remaining (0.0-1.0)
+        longtail_wait: Seconds to wait after percentile is reached before cancelling
         **client_kwargs: Arguments passed to Client constructor
 
     Returns:
         List of Response objects
     """
+    # If longtail parameters are provided, use a client instance
+    if longtail_percentile is not None or longtail_wait is not None:
+        client = Client(
+            longtail_percentile=longtail_percentile,
+            longtail_wait=longtail_wait,
+            **client_kwargs
+        )
+        return await client.request(requests, max_concurrent=max_concurrent)
     rust_requests: list[_RustRequest] = []
     for req in requests:
         rust_req = req.to_rust_request()
@@ -268,6 +315,7 @@ async def request(
             ),
             data=rust_req.get("body") if "body" in rust_req else rust_req.get("data"),
             timeout=rust_req.get("timeout"),
+            request_id=rust_req.get("request_id", ""),
         )
         rust_requests.append(old_req)
 

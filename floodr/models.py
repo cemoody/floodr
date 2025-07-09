@@ -1,6 +1,7 @@
 """Pydantic models for floodr API"""
 
 import json as json_module
+import uuid
 from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
@@ -9,6 +10,10 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 class Request(BaseModel):
     """HTTP request model with validation"""
 
+    request_id: str = Field(
+        default_factory=lambda: str(uuid.uuid4()),
+        description="Unique request identifier"
+    )
     method: Literal["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"] = Field(
         default="GET", description="HTTP method"
     )
@@ -47,6 +52,7 @@ class Request(BaseModel):
     def to_rust_request(self) -> dict[str, Any]:
         """Convert to format expected by Rust"""
         rust_req: dict[str, Any] = {
+            "request_id": self.request_id,
             "url": str(self.url),
             "method": self.method,
         }
@@ -79,6 +85,9 @@ class Request(BaseModel):
 class Response(BaseModel):
     """HTTP response model"""
 
+    request_id: Optional[str] = Field(
+        default=None, description="Request identifier from the original request"
+    )
     status_code: int = Field(description="HTTP status code")
     headers: dict[str, str] = Field(description="Response headers")
     content: bytes = Field(description="Raw response body")
