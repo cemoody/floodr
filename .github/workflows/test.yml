@@ -40,8 +40,25 @@ jobs:
     
     - name: Build and install package
       run: |
+        # Clean any existing installations and caches
+        pip uninstall -y floodr || true
+        pip cache purge || true
+        rm -rf build/ dist/ *.egg-info target/wheels/ || true
+        # Build the package fresh
         maturin build --release
-        python -m pip install --force-reinstall --find-links target/wheels floodr
+        # List built wheels
+        ls -la target/wheels/
+        # Install the built wheel using Python to handle cross-platform paths
+        python -c "import glob, subprocess, sys; wheels = glob.glob('target/wheels/floodr-*.whl'); subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--force-reinstall', '--no-deps', wheels[0]]) if wheels else sys.exit(1)"
+        # Install dependencies separately
+        pip install "pydantic>=2.0.0"
+    
+    - name: Verify installation
+      run: |
+        python -c "import floodr; print(f'floodr version: {floodr.__version__}')"
+        python -c "import floodr; print(f'floodr location: {floodr.__file__}')"
+        python -c "from floodr import Client; print(f'Client class: {Client}')"
+        python -c "from floodr import Client; import inspect; print(f'Client init signature: {inspect.signature(Client.__init__)}')"
     
     - name: Run tests
       run: |
@@ -81,6 +98,10 @@ jobs:
     
     - name: Type check with mypy
       run: |
+        # Clean and build fresh
+        rm -rf build/ dist/ *.egg-info target/wheels/ || true
         maturin build --release
-        python -m pip install --find-links target/wheels floodr
+        # Install the built wheel
+        python -c "import glob, subprocess, sys; wheels = glob.glob('target/wheels/floodr-*.whl'); subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--force-reinstall', '--no-deps', wheels[0]]) if wheels else sys.exit(1)"
+        pip install "pydantic>=2.0.0"
         mypy floodr/ --ignore-missing-imports 
