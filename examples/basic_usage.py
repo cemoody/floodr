@@ -71,9 +71,43 @@ async def post_with_json_example():
     responses = await request([req])
     resp = responses[0]
 
-    data = resp.json()
+    data = resp.json_data()
     print(f"Posted data: {data['json']}")
     print(f"Headers received: {data['headers']['X-Custom-Header']}")
+    print()
+
+
+async def post_with_body_example():
+    """POST request with raw body content."""
+    print("=== POST with Raw Body ===")
+    
+    # String body
+    req1 = Request(
+        url="https://httpbin.org/post",
+        method="POST",
+        body="This is raw text content",
+        headers={"Content-Type": "text/plain"}
+    )
+    
+    # Bytes body
+    req2 = Request(
+        url="https://httpbin.org/post",
+        method="POST",
+        body=b"Raw bytes content",
+        headers={"Content-Type": "application/octet-stream"}
+    )
+    
+    responses = await request([req1, req2])
+    
+    # Text response
+    data1 = responses[0].json_data()
+    print(f"Text body received: {data1['data']}")
+    print(f"Content-Type: {data1['headers']['Content-Type']}")
+    
+    # Binary response
+    data2 = responses[1].json_data()
+    print(f"Binary body received (base64): {data2['data']}")
+    print(f"Content-Type: {data2['headers']['Content-Type']}")
     print()
 
 
@@ -107,7 +141,7 @@ async def error_handling_example():
     print()
 
 
-async def client_reuse_example():
+async def client_example():
     """Client reuse for better performance."""
     print("=== Client Reuse ===")
 
@@ -128,6 +162,28 @@ async def client_reuse_example():
 
         success_count = sum(1 for r in responses if r.ok)
         print(f"  Completed {success_count}/{len(responses)} in {elapsed:.3f}s")
+    print()
+
+
+async def warmup_example():
+    """Connection pool warming example."""
+    print("=== Connection Pool Warming ===")
+    
+    # Warm up connections to a domain
+    print("Warming up 20 connections to httpbin.org...")
+    await warmup("https://httpbin.org", num_connections=20)
+    
+    # Now make requests - they'll use the warmed connections
+    requests_list = [
+        Request(url=f"https://httpbin.org/get?id={i}") for i in range(20)
+    ]
+    
+    start = time.time()
+    responses = await request(requests_list)
+    elapsed = time.time() - start
+    
+    print(f"Completed {len(responses)} requests in {elapsed:.3f}s")
+    print(f"Average: {elapsed/len(responses)*1000:.1f}ms per request")
     print()
 
 
@@ -167,8 +223,10 @@ async def main():
     await simple_get_example()
     await parallel_requests_example()
     await post_with_json_example()
+    await post_with_body_example()
     await error_handling_example()
-    await client_reuse_example()
+    await client_example()
+    await warmup_example()
     await concurrency_control_example()
 
     print("All examples completed!")
