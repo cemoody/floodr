@@ -69,6 +69,8 @@ async fn get_or_create_global_client(num_requests: usize, enable_compression: bo
 #[pyclass]
 pub struct Request {
     #[pyo3(get, set)]
+    pub request_id: String,
+    #[pyo3(get, set)]
     pub url: String,
     #[pyo3(get, set)]
     pub method: String,
@@ -85,7 +87,7 @@ pub struct Request {
 #[pymethods]
 impl Request {
     #[new]
-    #[pyo3(signature = (url, method=None, headers=None, json=None, data=None, timeout=None))]
+    #[pyo3(signature = (url, method=None, headers=None, json=None, data=None, timeout=None, request_id=None))]
     fn new(
         url: String,
         method: Option<String>,
@@ -93,8 +95,10 @@ impl Request {
         json: Option<String>,
         data: Option<Vec<u8>>,
         timeout: Option<f64>,
+        request_id: Option<String>,
     ) -> Self {
         Request {
+            request_id: request_id.unwrap_or_else(|| "".to_string()),
             url,
             method: method.unwrap_or_else(|| "GET".to_string()),
             headers,
@@ -108,6 +112,8 @@ impl Request {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[pyclass]
 pub struct Response {
+    #[pyo3(get)]
+    pub request_id: String,
     #[pyo3(get)]
     pub status_code: u16,
     #[pyo3(get)]
@@ -171,6 +177,7 @@ fn parse_method(method_str: &str) -> Method {
 async fn execute_request(client: Arc<Client>, request: Request) -> Response {
     let start = Instant::now();
     let url = request.url.clone();
+    let request_id = request.request_id.clone();
     
     // Parse method with optimized function
     let method = parse_method(&request.method);
@@ -234,6 +241,7 @@ async fn execute_request(client: Arc<Client>, request: Request) -> Response {
                     };
                     
                     Response {
+                        request_id,
                         status_code: status.as_u16(),
                         headers,
                         content,
@@ -245,6 +253,7 @@ async fn execute_request(client: Arc<Client>, request: Request) -> Response {
                     }
                 }
                 Err(e) => Response {
+                    request_id,
                     status_code: status.as_u16(),
                     headers,
                     content: vec![],
@@ -257,6 +266,7 @@ async fn execute_request(client: Arc<Client>, request: Request) -> Response {
             }
         }
         Err(e) => Response {
+            request_id,
             status_code: 0,
             headers: HashMap::new(),
             content: vec![],
@@ -395,6 +405,167 @@ impl ParallelClient {
         Ok(responses.into_pyobject(py)?.into_any())
     }
     
+    // Execute with longtail cancellation
+    fn execute_with_longtail<'py>(
+        &self, 
+        py: Python<'py>, 
+        requests: Vec<Request>, 
+        longtail_percentile: f64,
+        longtail_wait: f64,
+        max_concurrent: Option<usize>
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        let num_requests = requests.len();
+        let target_completed = ((num_requests as f64) * longtail_percentile) as usize;
+        
+        // Store original request data for cancelled responses
+        let request_data: Vec<(String, String)> = requests.iter()
+            .map(|r| (r.request_id.clone(), r.url.clone()))
+            .collect();
+        
+        let responses = py.allow_threads(move || {
+            get_runtime().block_on(async move {
+                use tokio::sync::Mutex;
+                use std::sync::atomic::{AtomicUsize, Ordering};
+                use tokio::time::timeout;
+                use futures::future::FutureExt;
+                
+                let completed_count = Arc::new(AtomicUsize::new(0));
+                let responses = Arc::new(Mutex::new(Vec::with_capacity(num_requests)));
+                let start_longtail_timer = Arc::new(Mutex::new(None::<Instant>));
+                
+                // Determine concurrency limit
+                let max_concurrent = max_concurrent.unwrap_or_else(|| {
+                    if num_requests > 100 {
+                        (num_requests / 10).max(100).min(500)
+                    } else {
+                        num_requests
+                    }
+                });
+                
+                let semaphore = Arc::new(Semaphore::new(max_concurrent));
+                
+                // Create futures for all requests
+                let futures: Vec<_> = requests
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, request)| {
+                        let client = client.clone();
+                        let semaphore = semaphore.clone();
+                        let completed_count = completed_count.clone();
+                        let responses = responses.clone();
+                        let start_longtail_timer = start_longtail_timer.clone();
+                        let request_id = request.request_id.clone();
+                        
+                        async move {
+                            let _permit = semaphore.acquire().await.unwrap();
+                            
+                            // Execute the request
+                            let response = execute_request(client, request).await;
+                            
+                            // Store the response
+                            {
+                                let mut resp_guard = responses.lock().await;
+                                resp_guard.push((index, response));
+                            }
+                            
+                            // Increment completed count
+                            let current_count = completed_count.fetch_add(1, Ordering::SeqCst) + 1;
+                            
+                            // Check if we've reached the target percentile
+                            if current_count == target_completed {
+                                let mut timer_guard = start_longtail_timer.lock().await;
+                                if timer_guard.is_none() {
+                                    *timer_guard = Some(Instant::now());
+                                }
+                            }
+                            
+                            request_id
+                        }.boxed()
+                    })
+                    .collect();
+                
+                // Run all futures with potential cancellation
+                let mut remaining_futures = futures;
+                let mut completed_ids = Vec::new();
+                
+                while !remaining_futures.is_empty() {
+                    // Check if we should apply longtail timeout
+                    let timeout_duration = {
+                        let timer_guard = start_longtail_timer.lock().await;
+                        if let Some(start_time) = *timer_guard {
+                            let elapsed = start_time.elapsed();
+                            if elapsed >= Duration::from_secs_f64(longtail_wait) {
+                                // Time to cancel remaining requests
+                                break;
+                            }
+                            Some(Duration::from_secs_f64(longtail_wait) - elapsed)
+                        } else {
+                            None
+                        }
+                    };
+                    
+                    // Wait for the next future to complete
+                    let (result, _index, new_remaining) = if let Some(timeout_dur) = timeout_duration {
+                        match timeout(timeout_dur, futures::future::select_all(remaining_futures)).await {
+                            Ok((result, index, remaining)) => (Some(result), Some(index), remaining),
+                            Err(_) => {
+                                // Timeout expired, cancel remaining
+                                break;
+                            }
+                        }
+                    } else {
+                        let (result, index, remaining) = futures::future::select_all(remaining_futures).await;
+                        (Some(result), Some(index), remaining)
+                    };
+                    
+                    if let Some(id) = result {
+                        completed_ids.push(id);
+                    }
+                    
+                    remaining_futures = new_remaining;
+                }
+                
+                // Create error responses for cancelled requests
+                let completed_count_final = completed_count.load(Ordering::SeqCst);
+                let mut final_responses = responses.lock().await.clone();
+                
+                // If we cancelled some requests, we need to add error responses for them
+                if final_responses.len() < num_requests {
+                    for i in 0..num_requests {
+                        // Check if this index is missing from responses
+                        if !final_responses.iter().any(|(idx, _)| *idx == i) {
+                            // Get the original request data
+                            let (request_id, url) = request_data[i].clone();
+                            
+                            // Create a cancelled response
+                            final_responses.push((i, Response {
+                                request_id,
+                                status_code: 0,
+                                headers: HashMap::new(),
+                                content: vec![],
+                                text: None,
+                                json: None,
+                                url,
+                                elapsed: 0.0,
+                                error: Some(format!("Request cancelled due to longtail timeout ({}% completed)", 
+                                    (completed_count_final as f64 / num_requests as f64 * 100.0) as i32)),
+                            }));
+                        }
+                    }
+                }
+                
+                // Sort by original index to maintain order
+                final_responses.sort_by_key(|(index, _)| *index);
+                
+                // Extract just the responses
+                final_responses.into_iter().map(|(_, response)| response).collect::<Vec<_>>()
+            })
+        });
+        
+        Ok(responses.into_pyobject(py)?.into_any())
+    }
+
     // Warm up the connection pool by making multiple concurrent requests
     #[pyo3(signature = (url, num_connections=10))]
     fn warmup<'py>(&self, py: Python<'py>, url: String, num_connections: Option<usize>) -> PyResult<Bound<'py, PyAny>> {
@@ -653,6 +824,7 @@ mod tests {
             Some("{\"key\": \"value\"}".to_string()),
             None,
             Some(30.0),
+            None, // request_id
         );
         
         assert_eq!(req.url, "https://example.com");
@@ -666,6 +838,7 @@ mod tests {
     #[test]
     fn test_response_ok() {
         let resp = Response {
+            request_id: "test-id".to_string(),
             status_code: 200,
             headers: HashMap::new(),
             content: vec![],
@@ -679,6 +852,7 @@ mod tests {
         assert!(resp.ok());
         
         let resp_404 = Response {
+            request_id: "test-id-404".to_string(),
             status_code: 404,
             headers: HashMap::new(),
             content: vec![],
@@ -706,6 +880,7 @@ mod tests {
                 None,
                 None,
                 Some(10.0),
+                None, // request_id
             );
             
             let resp = execute_request(client, req).await;
@@ -732,6 +907,7 @@ mod tests {
                 None,
                 None,
                 Some(0.1), // Very short timeout
+                None, // request_id
             );
             
             let resp = execute_request(client, req).await;
@@ -755,6 +931,7 @@ mod tests {
                 None,
                 None,
                 Some(2.0),
+                None, // request_id
             );
             
             let resp = execute_request(client, req).await;
@@ -780,6 +957,7 @@ mod tests {
                     None,
                     None,
                     Some(10.0),
+                    None, // request_id
                 ))
                 .collect();
             
@@ -807,6 +985,7 @@ mod tests {
                 Some("{\"test\": \"data\"}".to_string()),
                 None,
                 Some(10.0),
+                None, // request_id
             );
             
             let resp = execute_request(client, req).await;
@@ -839,6 +1018,7 @@ mod tests {
                 None,
                 None,
                 Some(10.0),
+                None, // request_id
             );
             
             let resp = execute_request(client, req).await;

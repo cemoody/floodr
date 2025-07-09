@@ -36,12 +36,23 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install maturin pytest pytest-asyncio
+        pip install maturin pytest pytest-asyncio pytest-rerunfailures pydantic
     
     - name: Build and install package
+      shell: bash
       run: |
-        maturin build --release
-        python -m pip install --find-links target/wheels floodr
+        # Clean any existing installations and caches
+        pip uninstall -y floodr || true
+        pip cache purge || true
+        # Install in editable mode which handles the Rust extension properly
+        pip install -e . --verbose
+    
+    - name: Verify installation
+      run: |
+        python -c "import floodr; print(f'floodr version: {floodr.__version__}')"
+        python -c "import floodr; print(f'floodr location: {floodr.__file__}')"
+        python -c "from floodr import Client; print(f'Client class: {Client}')"
+        python -c "from floodr import Client; import inspect; print(f'Client init signature: {inspect.signature(Client.__init__)}')"
     
     - name: Run tests
       run: |
@@ -80,7 +91,8 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
     
     - name: Type check with mypy
+      shell: bash
       run: |
-        maturin build --release
-        python -m pip install --find-links target/wheels floodr
+        # Install in editable mode
+        pip install -e .
         mypy floodr/ --ignore-missing-imports 
