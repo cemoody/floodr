@@ -115,7 +115,7 @@ async def main():
     time_with_warmup, warmup_time = await with_warmup()
 
     # Compare results
-    print(f"\n=== Comparison ===")
+    print("\n=== Comparison ===")
     print(f"Without warmup: {time_without_warmup:.2f}s")
     print(f"With warmup: {time_with_warmup:.2f}s (+ {warmup_time:.2f}s warmup)")
     print(f"Total with warmup: {time_with_warmup + warmup_time:.2f}s")

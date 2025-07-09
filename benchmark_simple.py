@@ -199,7 +199,7 @@ async def main():
         print(f"\nSpeedup vs basic httpx:     {speedup_basic:.2f}x")
         print(f"Speedup vs optimized httpx: {speedup_opt:.2f}x")
         print(f"Speedup vs httpx HTTP/2:    {speedup_h2:.2f}x")
-        print(f"\nWith prewarming:")
+        print("\nWith prewarming:")
         print(f"Speedup vs basic httpx:     {speedup_basic_warmed:.2f}x")
         print(f"Speedup vs optimized httpx: {speedup_opt_warmed:.2f}x")
         print(f"Speedup vs httpx HTTP/2:    {speedup_h2_warmed:.2f}x")
