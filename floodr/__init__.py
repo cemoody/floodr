@@ -25,9 +25,7 @@ if TYPE_CHECKING:
         def execute_with_concurrency(
             self, requests: list[Any], max_concurrent: int
         ) -> list[Any]: ...
-        async def warmup(
-            self, url: str, num_connections: Optional[int] = None
-        ) -> None: ...
+        def warmup(self, url: str, num_connections: Optional[int] = None) -> None: ...
 
     class _RustRequest:
         def __init__(
