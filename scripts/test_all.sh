@@ -4,11 +4,9 @@
 set -e
 
 echo "Running all Rust tests (including network tests)..."
-cargo test -- --include-ignored
+cargo test --all-features -- --include-ignored
 
-echo ""
-echo "Running Python tests..."
-pytest tests/ -v
+echo -e "\nRunning Python tests..."
+pytest -v -p no:syrupy
 
-echo ""
-echo "All tests completed!" 
+echo -e "\nAll tests completed!" 

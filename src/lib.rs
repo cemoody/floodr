@@ -824,6 +824,7 @@ mod tests {
             Some("{\"key\": \"value\"}".to_string()),
             None,
             Some(30.0),
+            None, // request_id
         );
         
         assert_eq!(req.url, "https://example.com");
@@ -837,6 +838,7 @@ mod tests {
     #[test]
     fn test_response_ok() {
         let resp = Response {
+            request_id: "test-id".to_string(),
             status_code: 200,
             headers: HashMap::new(),
             content: vec![],
@@ -850,6 +852,7 @@ mod tests {
         assert!(resp.ok());
         
         let resp_404 = Response {
+            request_id: "test-id-404".to_string(),
             status_code: 404,
             headers: HashMap::new(),
             content: vec![],
@@ -877,6 +880,7 @@ mod tests {
                 None,
                 None,
                 Some(10.0),
+                None, // request_id
             );
             
             let resp = execute_request(client, req).await;
@@ -903,6 +907,7 @@ mod tests {
                 None,
                 None,
                 Some(0.1), // Very short timeout
+                None, // request_id
             );
             
             let resp = execute_request(client, req).await;
@@ -926,6 +931,7 @@ mod tests {
                 None,
                 None,
                 Some(2.0),
+                None, // request_id
             );
             
             let resp = execute_request(client, req).await;
@@ -951,6 +957,7 @@ mod tests {
                     None,
                     None,
                     Some(10.0),
+                    None, // request_id
                 ))
                 .collect();
             
@@ -978,6 +985,7 @@ mod tests {
                 Some("{\"test\": \"data\"}".to_string()),
                 None,
                 Some(10.0),
+                None, // request_id
             );
             
             let resp = execute_request(client, req).await;
@@ -1010,6 +1018,7 @@ mod tests {
                 None,
                 None,
                 Some(10.0),
+                None, // request_id
             );
             
             let resp = execute_request(client, req).await;
