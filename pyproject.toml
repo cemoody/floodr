@@ -32,10 +32,10 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/floodr"
-Documentation = "https://github.com/yourusername/floodr#readme"
-Repository = "https://github.com/yourusername/floodr"
-Issues = "https://github.com/yourusername/floodr/issues"
+Homepage = "https://github.com/cemoody/floodr"
+Documentation = "https://github.com/cemoody/floodr#readme"
+Repository = "https://github.com/cemoody/floodr"
+Issues = "https://github.com/cemoody/floodr/issues"
 
 [project.optional-dependencies]
 dev = [
