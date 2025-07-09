@@ -53,9 +53,6 @@ async fn get_or_create_global_client(num_requests: usize, enable_compression: bo
         .connect_timeout(Duration::from_secs(5))
         .tcp_keepalive(Duration::from_secs(60))
         .tcp_nodelay(true)
-        .http2_adaptive_window(true)
-        .http2_initial_stream_window_size(2_097_152) // 2MB initial window
-        .http2_initial_connection_window_size(4_194_304) // 4MB connection window
         .user_agent("floodr/1.0");
     
     if !enable_compression {
@@ -323,9 +320,6 @@ impl ParallelClient {
             .connect_timeout(Duration::from_secs(5))
             .tcp_keepalive(Duration::from_secs(60))
             .tcp_nodelay(true)
-            .http2_adaptive_window(true)
-            .http2_initial_stream_window_size(2_097_152)
-            .http2_initial_connection_window_size(4_194_304)
             .user_agent("floodr/1.0");
         
         if !enable_compression {
@@ -470,9 +464,6 @@ fn floodr(m: &Bound<'_, PyModule>) -> PyResult<()> {
                         .connect_timeout(Duration::from_secs(5))
                         .tcp_keepalive(Duration::from_secs(60))
                         .tcp_nodelay(true)
-                        .http2_adaptive_window(true)
-                        .http2_initial_stream_window_size(2_097_152)
-                        .http2_initial_connection_window_size(4_194_304)
                         .user_agent("floodr/1.0");
                     
                     if !enable_compression {
