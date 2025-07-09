@@ -3,7 +3,6 @@
 
 import asyncio
 import time
-from typing import List
 
 import httpx
 import uvloop  # Install with: pip install uvloop

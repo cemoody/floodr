@@ -5,6 +5,7 @@ A high-performance HTTP client library that executes multiple requests in parall
 similar to requests/httpx but optimized for bulk operations.
 """
 
+import asyncio
 import json as json_module
 from typing import TYPE_CHECKING, Any, Optional
 from urllib.parse import urlencode
@@ -20,8 +21,8 @@ if TYPE_CHECKING:
             timeout: float,
             enable_compression: bool,
         ) -> None: ...
-        async def execute(self, requests: list[Any]) -> list[Any]: ...
-        async def execute_with_concurrency(
+        def execute(self, requests: list[Any]) -> list[Any]: ...
+        def execute_with_concurrency(
             self, requests: list[Any], max_concurrent: int
         ) -> list[Any]: ...
         async def warmup(self, url: str, num_connections: Optional[int] = None) -> None: ...
@@ -66,6 +67,9 @@ if TYPE_CHECKING:
 
 else:
     # Import the Rust extension
+    # Create async wrappers for the sync functions
+    import asyncio
+
     from .floodr import ParallelClient
     from .floodr import Request as _RustRequest
     from .floodr import Response as _RustResponse
@@ -147,15 +151,22 @@ class Client:
             )
             old_format_requests.append(old_req)
 
+        # Run the sync methods in an executor
+        loop = asyncio.get_event_loop()
         if (
             hasattr(self._client, "execute_with_concurrency")
             and max_concurrent is not None
         ):
-            rust_responses = await self._client.execute_with_concurrency(
-                old_format_requests, max_concurrent
+            rust_responses = await loop.run_in_executor(
+                None,
+                self._client.execute_with_concurrency,
+                old_format_requests,
+                max_concurrent,
             )
         else:
-            rust_responses = await self._client.execute(old_format_requests)
+            rust_responses = await loop.run_in_executor(
+                None, self._client.execute, old_format_requests
+            )
 
         return [_convert_response(resp) for resp in rust_responses]
 
