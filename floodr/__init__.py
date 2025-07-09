@@ -25,7 +25,9 @@ if TYPE_CHECKING:
         def execute_with_concurrency(
             self, requests: list[Any], max_concurrent: int
         ) -> list[Any]: ...
-        async def warmup(self, url: str, num_connections: Optional[int] = None) -> None: ...
+        async def warmup(
+            self, url: str, num_connections: Optional[int] = None
+        ) -> None: ...
 
     class _RustRequest:
         def __init__(
@@ -73,9 +75,43 @@ else:
     from .floodr import ParallelClient
     from .floodr import Request as _RustRequest
     from .floodr import Response as _RustResponse
-    from .floodr import execute as _rust_execute
-    from .floodr import warmup as _rust_warmup
-    from .floodr import warmup_advanced as _rust_warmup_advanced
+    from .floodr import execute_sync as _rust_execute_sync
+    from .floodr import warmup_advanced_sync as _rust_warmup_advanced_sync
+    from .floodr import warmup_sync as _rust_warmup_sync
+
+    async def _rust_execute(
+        requests, use_global_client=True, max_concurrent=None, **kwargs
+    ):
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            lambda: _rust_execute_sync(
+                requests,
+                use_global_client=use_global_client,
+                max_concurrent=max_concurrent,
+                **kwargs,
+            ),
+        )
+
+    async def _rust_warmup(url, num_connections=None, enable_compression=None):
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None, _rust_warmup_sync, url, num_connections, enable_compression
+        )
+
+    async def _rust_warmup_advanced(
+        base_url, paths=None, num_connections=None, enable_compression=None, method=None
+    ):
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            _rust_warmup_advanced_sync,
+            base_url,
+            paths,
+            num_connections,
+            enable_compression,
+            method,
+        )
 
 
 __version__ = "0.1.0"
@@ -178,7 +214,8 @@ class Client:
             url: URL to warm up connections to
             num_connections: Number of connections to establish (default: 10)
         """
-        await self._client.warmup(url, num_connections)
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, self._client.warmup, url, num_connections)
 
 
 def _convert_response(rust_response: _RustResponse) -> Response:

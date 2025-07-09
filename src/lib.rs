@@ -403,30 +403,33 @@ impl ParallelClient {
     
     // Warm up the connection pool by making multiple concurrent requests
     #[pyo3(signature = (url, num_connections=10))]
-    fn warmup<'py>(&self, py: Python<'py>, url: String, num_connections: Option<usize>) -> PyResult<&'py PyAny> {
+    fn warmup<'py>(&self, py: Python<'py>, url: String, num_connections: Option<usize>) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         let connections_to_warm = num_connections.unwrap_or(10);
         
-        pyo3_asyncio::tokio::future_into_py(py, async move {
-            // Create multiple HEAD requests to warm up connections
-            let warmup_futures: Vec<_> = (0..connections_to_warm)
-                .map(|_| {
-                    let client = client.clone();
-                    let url = url.clone();
-                    async move {
-                        let _ = client
-                            .head(&url)
-                            .timeout(Duration::from_secs(5))
-                            .send()
-                            .await;
-                    }
-                })
-                .collect();
-            
-            // Execute all warmup requests concurrently
-            join_all(warmup_futures).await;
-            Ok(())
-        })
+        py.allow_threads(|| {
+            get_runtime().block_on(async move {
+                // Create multiple HEAD requests to warm up connections
+                let warmup_futures: Vec<_> = (0..connections_to_warm)
+                    .map(|_| {
+                        let client = client.clone();
+                        let url = url.clone();
+                        async move {
+                            let _ = client
+                                .head(&url)
+                                .timeout(Duration::from_secs(5))
+                                .send()
+                                .await;
+                        }
+                    })
+                    .collect();
+                
+                // Execute all warmup requests concurrently
+                join_all(warmup_futures).await;
+            })
+        });
+        
+        Ok(py.None().into_bound(py))
     }
 }
 
@@ -509,52 +512,56 @@ fn floodr(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Warmup function for global client - synchronous version
     #[pyfunction]
     #[pyo3(signature = (url, num_connections=10, enable_compression=false))]
-    fn warmup<'py>(py: Python<'py>, url: String, num_connections: Option<usize>, enable_compression: Option<bool>) -> PyResult<&'py PyAny> {
+    fn warmup_sync<'py>(py: Python<'py>, url: String, num_connections: Option<usize>, enable_compression: Option<bool>) -> PyResult<Bound<'py, PyAny>> {
         let connections_to_warm = num_connections.unwrap_or(10);
         let compression = enable_compression.unwrap_or(false);
         
-        pyo3_asyncio::tokio::future_into_py(py, async move {
-            // Get or create the global client with appropriate pool size
-            let client = get_or_create_global_client(connections_to_warm, compression).await;
-            
-            // Create multiple lightweight HEAD requests to the same domain
-            let warmup_futures: Vec<_> = (0..connections_to_warm)
-                .map(|_| {
-                    let client = client.clone();
-                    let url = url.clone();
-                    async move {
-                        // Use HEAD request with short timeout for warming up
-                        let _ = client
-                            .head(&url)
-                            .timeout(Duration::from_secs(5))
-                            .send()
-                            .await;
-                    }
-                })
-                .collect();
-            
-            // Execute all warmup requests concurrently
-            join_all(warmup_futures).await;
-            Ok(())
-        })
+        py.allow_threads(|| {
+            get_runtime().block_on(async move {
+                // Get or create the global client with appropriate pool size
+                let client = get_or_create_global_client(connections_to_warm, compression).await;
+                
+                // Create multiple lightweight HEAD requests to the same domain
+                let warmup_futures: Vec<_> = (0..connections_to_warm)
+                    .map(|_| {
+                        let client = client.clone();
+                        let url = url.clone();
+                        async move {
+                            // Use HEAD request with short timeout for warming up
+                            let _ = client
+                                .head(&url)
+                                .timeout(Duration::from_secs(5))
+                                .send()
+                                .await;
+                        }
+                    })
+                    .collect();
+                
+                // Execute all warmup requests concurrently
+                join_all(warmup_futures).await;
+            })
+        });
+        
+        Ok(py.None().into_bound(py))
     }
     
     // Advanced warmup with custom paths for better connection reuse
     #[pyfunction]
     #[pyo3(signature = (base_url, paths=None, num_connections=None, enable_compression=None, method=None))]
-    fn warmup_advanced<'py>(
+    fn warmup_advanced_sync<'py>(
         py: Python<'py>, 
         base_url: String, 
         paths: Option<Vec<String>>,
         num_connections: Option<usize>,
         enable_compression: Option<bool>,
         method: Option<String>
-    ) -> PyResult<&'py PyAny> {
+    ) -> PyResult<Bound<'py, PyAny>> {
         let connections_to_warm = num_connections.unwrap_or(10);
         let compression = enable_compression.unwrap_or(false);
         let request_method = method.unwrap_or_else(|| "HEAD".to_string());
         
-        pyo3_asyncio::tokio::future_into_py(py, async move {
+        let results = py.allow_threads(|| {
+            get_runtime().block_on(async move {
             // Get or create the global client
             let client = get_or_create_global_client(connections_to_warm, compression).await;
             
@@ -595,33 +602,32 @@ fn floodr(m: &Bound<'_, PyModule>) -> PyResult<()> {
                 })
                 .collect();
             
-            // Execute all warmup requests and collect results
-            let results = join_all(warmup_futures).await;
-            
-            // Convert results to Python dict
-            let py_results: Vec<HashMap<String, PyObject>> = Python::with_gil(|py| {
-                results
-                    .into_iter()
-                    .map(|(url, status, elapsed, error)| {
-                        let mut result = HashMap::new();
-                        result.insert("url".to_string(), url.into_py(py));
-                        result.insert("status".to_string(), status.into_py(py));
-                        result.insert("elapsed".to_string(), elapsed.into_py(py));
-                        if let Some(err) = error {
-                            result.insert("error".to_string(), err.into_py(py));
-                        }
-                        result
-                    })
-                    .collect()
-            });
-            
-            Ok(py_results)
-        })
+                // Execute all warmup requests and collect results
+                join_all(warmup_futures).await
+            })
+        });
+        
+        // Convert results to Python dict
+        let py_results: Vec<HashMap<&str, PyObject>> = results
+            .into_iter()
+            .map(|(url, status, elapsed, error)| {
+                let mut result = HashMap::new();
+                result.insert("url", url.into_pyobject(py).unwrap().into());
+                result.insert("status", status.into_pyobject(py).unwrap().into());
+                result.insert("elapsed", elapsed.into_pyobject(py).unwrap().into());
+                if let Some(err) = error {
+                    result.insert("error", err.into_pyobject(py).unwrap().into());
+                }
+                result
+            })
+            .collect();
+        
+        Ok(py_results.into_pyobject(py)?.into_any())
     }
     
-    m.add_function(wrap_pyfunction!(execute, m)?)?;
-    m.add_function(wrap_pyfunction!(warmup, m)?)?;
-    m.add_function(wrap_pyfunction!(warmup_advanced, m)?)?;
+    m.add_function(wrap_pyfunction!(execute_sync, m)?)?;
+    m.add_function(wrap_pyfunction!(warmup_sync, m)?)?;
+    m.add_function(wrap_pyfunction!(warmup_advanced_sync, m)?)?;
     
     Ok(())
 }
