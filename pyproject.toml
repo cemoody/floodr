@@ -58,6 +58,10 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 # Disable syrupy to avoid conflicts with pytest-rerunfailures
 addopts = "-p no:syrupy"
+# Register custom markers
+markers = [
+    "flaky: mark test as flaky and enable automatic retries",
+]
 
 [tool.black]
 line-length = 88
