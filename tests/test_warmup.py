@@ -116,4 +116,4 @@ async def test_warmup_improves_latency():
     if len(successful_responses2) >= 5:
         assert (
             len(successful_responses2) >= len(requests) * 0.8
-        ), f"Too many failed requests in second batch"
+        ), "Too many failed requests in second batch"
