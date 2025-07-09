@@ -124,6 +124,73 @@ async def test_error_handling():
     assert responses[0].error is not None
 
 
+@pytest.mark.asyncio
+@retry_flaky(max_attempts=3, backoff_base=1.0)
+async def test_body_parameter():
+    """Test body parameter for raw content."""
+    # Test with string body
+    req = Request(
+        url="https://httpbin.org/post",
+        method="POST",
+        body="This is raw text content",
+        headers={"Content-Type": "text/plain"},
+    )
+    responses = await request([req])
+
+    assert len(responses) == 1
+    assert responses[0].status_code == 200
+    data = responses[0].json_data()
+    assert data["data"] == "This is raw text content"
+    assert data["headers"]["Content-Type"] == "text/plain"
+
+    # Test with bytes body
+    req = Request(
+        url="https://httpbin.org/post",
+        method="POST",
+        body=b"Raw bytes content",
+        headers={"Content-Type": "application/octet-stream"},
+    )
+    responses = await request([req])
+
+    assert len(responses) == 1
+    assert responses[0].status_code == 200
+    data = responses[0].json_data()
+    # httpbin returns binary data as string when it can decode it
+    assert data["data"] == "Raw bytes content"
+    assert data["headers"]["Content-Type"] == "application/octet-stream"
+
+
+def test_body_validation():
+    """Test that only one body parameter can be specified."""
+    # Should work with just body
+    req = Request(url="https://example.com", body="test")
+    assert req.body == "test"
+
+    # Should work with just data
+    req = Request(url="https://example.com", data={"key": "value"})
+    assert req.data == {"key": "value"}
+
+    # Should work with just json
+    req = Request(url="https://example.com", json={"key": "value"})
+    assert req.json_data == {"key": "value"}
+
+    # Should fail with multiple body parameters
+    with pytest.raises(
+        ValueError, match="Only one of 'json', 'data', or 'body' can be specified"
+    ):
+        Request(url="https://example.com", body="test", data={"key": "value"})
+
+    with pytest.raises(
+        ValueError, match="Only one of 'json', 'data', or 'body' can be specified"
+    ):
+        Request(url="https://example.com", body="test", json={"key": "value"})
+
+    with pytest.raises(
+        ValueError, match="Only one of 'json', 'data', or 'body' can be specified"
+    ):
+        Request(url="https://example.com", data={"key": "value"}, json={"key": "value"})
+
+
 def test_response_model():
     """Test Response model functionality."""
     resp = Response(
