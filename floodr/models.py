@@ -12,7 +12,7 @@ class Request(BaseModel):
 
     request_id: str = Field(
         default_factory=lambda: str(uuid.uuid4()),
-        description="Unique request identifier"
+        description="Unique request identifier",
     )
     method: Literal["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"] = Field(
         default="GET", description="HTTP method"

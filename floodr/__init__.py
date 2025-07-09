@@ -210,7 +210,7 @@ class Client:
 
         # Run the sync methods in an executor
         loop = asyncio.get_event_loop()
-        
+
         # Check if we should use longtail execution
         if self.longtail_percentile is not None and self.longtail_wait is not None:
             rust_responses = await loop.run_in_executor(
@@ -291,7 +291,7 @@ async def request(
         client = Client(
             longtail_percentile=longtail_percentile,
             longtail_wait=longtail_wait,
-            **client_kwargs
+            **client_kwargs,
         )
         return await client.request(requests, max_concurrent=max_concurrent)
     rust_requests: list[_RustRequest] = []
