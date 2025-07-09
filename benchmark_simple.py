@@ -80,6 +80,42 @@ async def benchmark_floodr(url: str, num_requests: int) -> float:
     return elapsed
 
 
+async def benchmark_floodr_prewarmed(
+    url: str, num_requests: int, warmup_connections: int = 50
+) -> float:
+    """Benchmark floodr with prewarmed connection pool."""
+    # Extract domain from URL for warming
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    base_url = f"{parsed.scheme}://{parsed.netloc}"
+
+    # Warm up the connection pool (not counted in timing)
+    print(f"  (warming {warmup_connections} connections...)", end="", flush=True)
+    warmup_start = time.time()
+    await warmup(base_url, num_connections=warmup_connections)
+    warmup_time = time.time() - warmup_start
+    print(f" done in {warmup_time:.2f}s)")
+
+    # Now run the actual benchmark
+    start = time.time()
+
+    # Create request objects
+    requests = [Request(url=url) for _ in range(num_requests)]
+
+    # Execute all requests in parallel (will use warmed connections)
+    responses = await request(requests)
+
+    # Verify all successful
+    success_count = sum(1 for r in responses if r.status_code == 200)
+
+    elapsed = time.time() - start
+    print(
+        f"floodr (warmed):  {num_requests} requests in {elapsed:.3f}s ({success_count} successful)"
+    )
+    return elapsed
+
+
 async def main():
     """Run benchmarks for different request counts."""
     url = "https://jsonplaceholder.typicode.com/posts/1"
@@ -139,14 +175,35 @@ async def main():
         # Run floodr benchmark
         floodr_time = await benchmark_floodr(url, count)
 
+        await asyncio.sleep(0.5)
+
+        # Run floodr with prewarming
+        warmup_connections = min(
+            count // 2, 100
+        )  # Use half the requests or 100, whichever is smaller
+        floodr_warmed_time = await benchmark_floodr_prewarmed(
+            url, count, warmup_connections
+        )
+
         # Calculate speedups
         speedup_basic = httpx_time / floodr_time
         speedup_opt = httpx_opt_time / floodr_time
         speedup_h2 = httpx_h2_time / floodr_time
 
-        print(f"Speedup vs basic httpx:     {speedup_basic:.2f}x")
+        # Speedups for warmed floodr
+        speedup_basic_warmed = httpx_time / floodr_warmed_time
+        speedup_opt_warmed = httpx_opt_time / floodr_warmed_time
+        speedup_h2_warmed = httpx_h2_time / floodr_warmed_time
+        warmed_improvement = floodr_time / floodr_warmed_time
+
+        print(f"\nSpeedup vs basic httpx:     {speedup_basic:.2f}x")
         print(f"Speedup vs optimized httpx: {speedup_opt:.2f}x")
         print(f"Speedup vs httpx HTTP/2:    {speedup_h2:.2f}x")
+        print(f"\nWith prewarming:")
+        print(f"Speedup vs basic httpx:     {speedup_basic_warmed:.2f}x")
+        print(f"Speedup vs optimized httpx: {speedup_opt_warmed:.2f}x")
+        print(f"Speedup vs httpx HTTP/2:    {speedup_h2_warmed:.2f}x")
+        print(f"Improvement over cold start: {warmed_improvement:.2f}x")
         print()
 
 

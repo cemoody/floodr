@@ -10,4 +10,8 @@
 - Type-safe API with Pydantic models
 - Automatic concurrency management
 - Connection pooling
-- Comprehensive error handling 
+- Comprehensive error handling
+- Connection pool warming for reduced latency
+  - `warmup()` function to pre-establish connections
+  - `warmup_advanced()` for warming specific endpoints
+  - Support for warming both global and client-specific pools 

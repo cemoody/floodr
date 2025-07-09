@@ -229,6 +229,69 @@ client = Client()
 responses = await client.request(requests, max_concurrent=20)
 ```
 
+### Connection Pool Warming
+
+When you know you'll be making many concurrent requests to a specific domain, you can pre-warm the connection pool to reduce latency:
+
+```python
+import floodr
+
+# Pre-establish 100 connections to the domain
+await floodr.warmup("https://api.example.com", num_connections=100)
+
+# Now make your actual requests - they'll reuse the warmed connections
+requests = [Request(url=f"https://api.example.com/item/{i}") for i in range(100)]
+responses = await request(requests)  # Much lower latency!
+```
+
+#### Why Warm Connections?
+
+When making HTTP requests, establishing new connections involves:
+1. DNS resolution
+2. TCP handshake
+3. TLS negotiation (for HTTPS)
+
+This can add 50-200ms per connection. By pre-warming the pool, subsequent requests can reuse existing connections, significantly reducing latency.
+
+#### Advanced Warming
+
+For more control, use `warmup_advanced`:
+
+```python
+# Warm specific endpoints with detailed results
+results = await floodr.warmup_advanced(
+    base_url="https://api.example.com",
+    paths=["/health", "/api/v1/status", "/api/v1/users"],
+    num_connections=50,
+    method="HEAD"  # Use HEAD for minimal data transfer
+)
+
+# Check warmup results
+for result in results:
+    print(f"{result['url']}: {result['status']} in {result['elapsed']:.3f}s")
+```
+
+#### Using with Client
+
+The `Client` class also supports warming:
+
+```python
+client = Client(max_connections=1000)
+
+# Warm the client's connection pool
+await client.warmup("https://api.example.com", num_connections=100)
+
+# Use the warmed client
+responses = await client.request(requests)
+```
+
+#### Best Practices
+
+1. **Warm before bulk requests**: If you're about to make 100+ requests to a domain, warm with 10-20% of that number
+2. **Use HEAD requests**: The default HEAD method minimizes data transfer during warming
+3. **Consider server limits**: Don't warm more connections than the server can handle
+4. **Reuse warmed pools**: The global client maintains connections for 5 minutes
+
 ## Performance
 
 floodr is designed for high-performance parallel requests:

@@ -24,7 +24,7 @@ if TYPE_CHECKING:
         async def execute_with_concurrency(
             self, requests: list[Any], max_concurrent: int
         ) -> list[Any]: ...
-        async def warmup(self, url: str) -> None: ...
+        async def warmup(self, url: str, num_connections: Optional[int] = None) -> None: ...
 
     class _RustRequest:
         def __init__(
@@ -51,7 +51,18 @@ if TYPE_CHECKING:
         max_concurrent: Optional[int] = None,
         **kwargs: Any,
     ) -> list[_RustResponse]: ...
-    async def _rust_warmup(url: str) -> None: ...
+    async def _rust_warmup(
+        url: str,
+        num_connections: Optional[int] = None,
+        enable_compression: Optional[bool] = None,
+    ) -> None: ...
+    async def _rust_warmup_advanced(
+        base_url: str,
+        paths: Optional[list[str]] = None,
+        num_connections: Optional[int] = None,
+        enable_compression: Optional[bool] = None,
+        method: Optional[str] = None,
+    ) -> list[dict[str, Any]]: ...
 
 else:
     # Import the Rust extension
@@ -60,6 +71,8 @@ else:
     from .floodr import Response as _RustResponse
     from .floodr import execute as _rust_execute
     from .floodr import warmup as _rust_warmup
+    from .floodr import warmup_advanced as _rust_warmup_advanced
+
 
 __version__ = "0.1.0"
 __all__ = [
@@ -68,6 +81,7 @@ __all__ = [
     "Response",
     "request",
     "warmup",
+    "warmup_advanced",
 ]
 
 
@@ -145,9 +159,15 @@ class Client:
 
         return [_convert_response(resp) for resp in rust_responses]
 
-    async def warmup(self, url: str):
-        """Warm up the connection pool by making a dummy request"""
-        await self._client.warmup(url)
+    async def warmup(self, url: str, num_connections: int = 10):
+        """
+        Warm up the connection pool by establishing multiple connections.
+
+        Args:
+            url: URL to warm up connections to
+            num_connections: Number of connections to establish (default: 10)
+        """
+        await self._client.warmup(url, num_connections)
 
 
 def _convert_response(rust_response: _RustResponse) -> Response:
@@ -214,6 +234,53 @@ async def request(
     return [_convert_response(resp) for resp in rust_responses]
 
 
-async def warmup(url: str):
-    """Warm up the global connection pool"""
-    await _rust_warmup(url)
+async def warmup(url: str, num_connections: int = 10, enable_compression: bool = False):
+    """
+    Warm up the global connection pool by establishing multiple connections.
+
+    Args:
+        url: URL to warm up connections to
+        num_connections: Number of connections to pre-establish (default: 10)
+        enable_compression: Whether to enable compression for the warmed connections
+
+    This is useful when you know you'll be making many concurrent requests to
+    a specific domain soon. Pre-warming the connection pool can significantly
+    reduce latency for the actual requests.
+    """
+    await _rust_warmup(url, num_connections, enable_compression)
+
+
+async def warmup_advanced(
+    base_url: str,
+    paths: Optional[list[str]] = None,
+    num_connections: int = 10,
+    enable_compression: bool = False,
+    method: str = "HEAD",
+) -> list[dict[str, Any]]:
+    """
+    Advanced warmup with custom paths and detailed results.
+
+    Args:
+        base_url: Base URL of the domain to warm up
+        paths: List of paths to use for warming (default: ["/"])
+        num_connections: Number of connections to establish
+        enable_compression: Whether to enable compression
+        method: HTTP method to use for warmup (default: "HEAD")
+
+    Returns:
+        List of dicts with warmup results for each connection:
+        - url: The full URL that was warmed
+        - status: HTTP status code (0 if failed)
+        - elapsed: Time taken in seconds
+        - error: Error message if failed (optional)
+
+    Example:
+        results = await warmup_advanced(
+            "https://api.example.com",
+            paths=["/health", "/api/v1/status"],
+            num_connections=50
+        )
+    """
+    return await _rust_warmup_advanced(
+        base_url, paths, num_connections, enable_compression, method
+    )

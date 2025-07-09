@@ -113,6 +113,33 @@ async def benchmark_floodr(url: str, num_requests: int) -> float:
     return elapsed
 
 
+async def benchmark_floodr_prewarmed(
+    url: str, num_requests: int, warmup_connections: int = 50
+) -> float:
+    """Benchmark floodr with prewarmed connection pool."""
+    # Extract domain from URL for warming
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    base_url = f"{parsed.scheme}://{parsed.netloc}"
+
+    # Warm up the connection pool (not counted in timing)
+    print(f"  (warming {warmup_connections} connections...)", end="", flush=True)
+    warmup_start = time.time()
+    await warmup(base_url, num_connections=warmup_connections)
+    warmup_time = time.time() - warmup_start
+    print(f" done in {warmup_time:.2f}s)")
+
+    # Now run the actual benchmark
+    start = time.time()
+    requests = [Request(url=url) for _ in range(num_requests)]
+    responses = await request(requests)
+    elapsed = time.time() - start
+    success = sum(1 for r in responses if r.status_code == 200)
+    print(f"floodr (warmed): {num_requests} requests in {elapsed:.3f}s ({success} OK)")
+    return elapsed
+
+
 def create_optimized_client(http2: bool = False) -> httpx.AsyncClient:
     """Create an optimized httpx client."""
     return httpx.AsyncClient(
@@ -123,7 +150,7 @@ def create_optimized_client(http2: bool = False) -> httpx.AsyncClient:
         timeout=httpx.Timeout(30.0, connect=5.0),
         # Disable some features that might add overhead
         follow_redirects=False,
-        default_headers={"Accept-Encoding": "gzip, deflate, br"},
+        headers={"Accept-Encoding": "gzip, deflate, br"},
     )
 
 
@@ -187,18 +214,44 @@ async def main():
 
         # Test floodr
         results[count]["floodr"] = await benchmark_floodr(url, count)
+        await asyncio.sleep(0.5)
+
+        # Test floodr with prewarming
+        warmup_connections = min(
+            count // 2, 100
+        )  # Use half the requests or 100, whichever is smaller
+        results[count]["floodr_warmed"] = await benchmark_floodr_prewarmed(
+            url, count, warmup_connections
+        )
 
         # Print comparisons
         print(f"\nPerformance comparison for {count} requests:")
         floodr_time = results[count]["floodr"]
+        floodr_warmed_time = results[count]["floodr_warmed"]
+
+        # Compare against regular floodr
+        print("\nCompared to floodr (cold start):")
         for method, time_taken in results[count].items():
-            if method != "floodr":
+            if method not in ["floodr", "floodr_warmed"]:
                 speedup = time_taken / floodr_time
                 improvement = results[count]["basic"] / time_taken
                 print(
                     f"  {method}: {speedup:.2f}x slower than floodr, "
                     f"{improvement:.2f}x faster than basic httpx"
                 )
+
+        # Compare against warmed floodr
+        print("\nCompared to floodr (prewarmed):")
+        for method, time_taken in results[count].items():
+            if method not in ["floodr", "floodr_warmed"]:
+                speedup = time_taken / floodr_warmed_time
+                print(f"  {method}: {speedup:.2f}x slower than warmed floodr")
+
+        # Show improvement from warming
+        warmed_improvement = floodr_time / floodr_warmed_time
+        print(
+            f"\nFloodr warmup improvement: {warmed_improvement:.2f}x faster with prewarming"
+        )
 
 
 async def main_with_uvloop():
