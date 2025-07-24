@@ -14,4 +14,7 @@
 - Connection pool warming for reduced latency
   - `warmup()` function to pre-establish connections
   - `warmup_advanced()` for warming specific endpoints
-  - Support for warming both global and client-specific pools 
+  - Support for warming both global and client-specific pools
+- Added `body` parameter for raw content (string or bytes)
+  - Matches httpx behavior for explicit raw content
+  - Validation ensures only one of `json`, `data`, or `body` can be specified 

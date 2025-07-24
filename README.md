@@ -97,6 +97,18 @@ requests = [
         url="https://httpbin.org/get",
         params={"search": "query", "page": "1"}
     ),
+    Request(
+        url="https://httpbin.org/post",
+        method="POST",
+        body="Raw text content",  # Send raw text
+        headers={"Content-Type": "text/plain"}
+    ),
+    Request(
+        url="https://httpbin.org/post", 
+        method="POST",
+        body=b"Raw bytes content",  # Send raw bytes
+        headers={"Content-Type": "application/octet-stream"}
+    ),
 ]
 
 # Execute multiple requests in parallel
@@ -129,7 +141,10 @@ The `Request` model supports the following fields:
 - `params`: URL query parameters (dict or dict with list values for multiple params)
 - `json`: JSON body data (automatically serialized)
 - `data`: Form data or raw body (string, bytes, or dict)
+- `body`: Raw body content (string or bytes) - for explicit raw content
 - `timeout`: Request timeout in seconds
+
+**Note**: Only one of `json`, `data`, or `body` can be specified per request.
 
 ### Response Model
 

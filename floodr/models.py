@@ -4,7 +4,14 @@ import json as json_module
 import uuid
 from typing import Any, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    field_validator,
+    model_validator,
+)
 
 
 class Request(BaseModel):
@@ -28,6 +35,9 @@ class Request(BaseModel):
     data: Optional[Union[str, bytes, dict[str, Any]]] = Field(
         default=None, description="Form data or raw body"
     )
+    body: Optional[Union[str, bytes]] = Field(
+        default=None, description="Raw body content (string or bytes)"
+    )
     timeout: Optional[float] = Field(
         default=None, description="Request timeout in seconds"
     )
@@ -49,6 +59,18 @@ class Request(BaseModel):
         """Ensure method is uppercase"""
         return v.upper()
 
+    @model_validator(mode="after")
+    def validate_body_params(self):
+        """Ensure only one body parameter is used"""
+        body_params = [
+            self.json_data is not None,
+            self.data is not None,
+            self.body is not None,
+        ]
+        if sum(body_params) > 1:
+            raise ValueError("Only one of 'json', 'data', or 'body' can be specified")
+        return self
+
     def to_rust_request(self) -> dict[str, Any]:
         """Convert to format expected by Rust"""
         rust_req: dict[str, Any] = {
@@ -65,8 +87,13 @@ class Request(BaseModel):
 
         if self.json_data is not None:
             rust_req["json"] = self.json_data
-
-        if self.data is not None:
+        elif self.body is not None:
+            # body parameter takes precedence over data for raw content
+            if isinstance(self.body, str):
+                rust_req["body"] = self.body.encode()
+            else:
+                rust_req["body"] = self.body
+        elif self.data is not None:
             if isinstance(self.data, dict):
                 rust_req["data"] = self.data
             elif isinstance(self.data, bytes):
